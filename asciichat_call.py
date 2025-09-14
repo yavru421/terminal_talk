@@ -41,13 +41,13 @@ def wait_for_ring():
                 ans = input("Accept call? (y/n): ").strip().lower()
                 if ans == 'y':
                     conn.sendall(b'ACCEPT')
-                    return conn, addr[0]
+                    return True, addr[0]
                 else:
                     conn.sendall(b'REJECT')
-                    return None, None
+                    return False, None
             else:
                 print("[WARN] Unknown message received.")
-                return None, None
+                return False, None
 
 # --- Video/Audio Send/Receive ---
 def send_video_audio(peer_ip):
@@ -65,27 +65,39 @@ def send_video_audio(peer_ip):
         s.sendall(data)
     print("[INFO] Sent ASCII video/audio to peer!")
 
-def receive_video_audio(conn):
-    size_bytes = b''
-    while len(size_bytes) < 8:
-        size_bytes += conn.recv(8 - len(size_bytes))
-    total_size = int.from_bytes(size_bytes, 'big')
-    print(f"[INFO] Expecting {total_size} bytes...")
-    data = b''
-    while len(data) < total_size:
-        packet = conn.recv(min(4096, total_size - len(data)))
-        if not packet:
-            break
-        data += packet
-    print(f"[INFO] Received {len(data)} bytes.")
-    npz = np.load(io.BytesIO(data), allow_pickle=True)
-    ascii_grids = npz['ascii_grids'].tolist()
-    audio = npz['audio']
-    audio_sr = int(npz['audio_sr'])
-    print(f"[INFO] Playing back {len(ascii_grids)} frames, audio_sr={audio_sr}")
-    play_video_with_audio = play_ascii_tkinter(ascii_grids, 30, font_size=10, font_family="Consolas")
-    if callable(play_video_with_audio):
-        play_video_with_audio(audio, audio_sr)
+def receive_video_audio():
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', PORT))
+        s.listen(1)
+        print(f"[INFO] Waiting for video data on port {PORT}...")
+        conn, addr = s.accept()
+        with conn:
+            print(f"[INFO] Receiving video data from {addr[0]}")
+            size_bytes = b''
+            while len(size_bytes) < 8:
+                chunk = conn.recv(8 - len(size_bytes))
+                if not chunk:
+                    print("[ERROR] Connection closed while receiving size")
+                    return
+                size_bytes += chunk
+            total_size = int.from_bytes(size_bytes, 'big')
+            print(f"[INFO] Expecting {total_size} bytes...")
+            data = b''
+            while len(data) < total_size:
+                chunk = conn.recv(min(4096, total_size - len(data)))
+                if not chunk:
+                    print("[ERROR] Connection closed while receiving data")
+                    return
+                data += chunk
+            print(f"[INFO] Received {len(data)} bytes.")
+            npz = np.load(io.BytesIO(data), allow_pickle=True)
+            ascii_grids = npz['ascii_grids'].tolist()
+            audio = npz['audio']
+            audio_sr = int(npz['audio_sr'])
+            print(f"[INFO] Playing back {len(ascii_grids)} frames, audio_sr={audio_sr}")
+            play_video_with_audio = play_ascii_tkinter(ascii_grids, 30, font_size=10, font_family="Consolas")
+            if callable(play_video_with_audio):
+                play_video_with_audio(audio, audio_sr)
 
 # --- Unified CLI ---
 def main():
@@ -96,9 +108,10 @@ def main():
     print("3. Exit")
     choice = input("Select an option: ").strip()
     if choice == "1":
-        conn, peer_ip = wait_for_ring()
-        if conn:
-            receive_video_audio(conn)
+        accepted, peer_ip = wait_for_ring()
+        if accepted:
+            print("[INFO] Call accepted. Waiting for video data...")
+            receive_video_audio()
     elif choice == "2":
         peer_handle = input("Enter peer handle: ").strip()
         peer_ip = lookup_handle(peer_handle)
@@ -106,7 +119,7 @@ def main():
             print(f"[WARN] Peer {peer_handle} not found in directory.")
             return
         if ring_peer(peer_ip):
-            time.sleep(1)  # Give peer time to get ready
+            time.sleep(2)  # Give peer time to get ready for video data
             send_video_audio(peer_ip)
     else:
         print("Goodbye!")
