@@ -3,3 +3,7 @@ numpy
 colorama
 imageio[ffmpeg]
 requests
+sounddevice
+soundfile
+pillow
+tkinter
