@@ -9,6 +9,7 @@ import numpy as np
 import io
 
 PORT = 50007
+VIDEO_PORT = 50008
 
 # --- Ring/Accept/Reject Protocol ---
 def ring_peer(peer_ip):
@@ -30,6 +31,7 @@ def ring_peer(peer_ip):
 
 def wait_for_ring():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('', PORT))
         s.listen(1)
         print(f"[INFO] Waiting for incoming call on port {PORT}...")
@@ -60,16 +62,17 @@ def send_video_audio(peer_ip):
     np.savez_compressed(buf, ascii_grids=ascii_grids, audio=audio, audio_sr=audio_sr)
     data = buf.getvalue()
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.connect((peer_ip, PORT))
+        s.connect((peer_ip, VIDEO_PORT))
         s.sendall(len(data).to_bytes(8, 'big'))
         s.sendall(data)
     print("[INFO] Sent ASCII video/audio to peer!")
 
 def receive_video_audio():
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        s.bind(('', PORT))
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        s.bind(('', VIDEO_PORT))
         s.listen(1)
-        print(f"[INFO] Waiting for video data on port {PORT}...")
+        print(f"[INFO] Waiting for video data on port {VIDEO_PORT}...")
         conn, addr = s.accept()
         with conn:
             print(f"[INFO] Receiving video data from {addr[0]}")
