@@ -9,7 +9,7 @@ import tkinter as tk
 import sounddevice as sd
 import soundfile as sf
 
-ASCII_CHARS = '@$B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~<>i!lI;:,"^`\\'. '
+ASCII_CHARS = "@$B%8&WM#*oahkbdpqwmZO0QLCJUYXzcvunxrjft/|()1{}[]?-_+~<>i!lI;:,^`'. "
 
 # Convert frame to ASCII grid with color
 
