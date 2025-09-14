@@ -6,4 +6,3 @@ requests
 sounddevice
 soundfile
 pillow
-tkinter
